@@ -1,4 +1,4 @@
-module Database
+module Abstract.Database
 	( DATABASE
 	, CollectionImpl
 	, Collection
