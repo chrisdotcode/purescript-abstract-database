@@ -1,5 +1,10 @@
 {
   "name": "purescript-abstract-database",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/chrisdotcode/purescript-abstract-database.git"
+  },
   "ignore": [
     "**/.*",
     "node_modules",
