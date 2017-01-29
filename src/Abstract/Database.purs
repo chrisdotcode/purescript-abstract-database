@@ -114,7 +114,7 @@ import Unsafe.Coerce          (unsafeCoerce)
 foreign import data DATABASE       :: !
 foreign import data CollectionImpl :: *
 
-data Collection t = Collection CollectionImpl
+type Collection t = { collectionImpl :: CollectionImpl }
 
 newtype Pagination = Pagination
 	{ skip   :: Maybe Int
