@@ -62,13 +62,6 @@ module Abstract.Database
 	, custom'
 	, custom
 	, class Database
-	, createDatabase
-	, deleteDatabase
-	, importDatabase
-	, exportDatabase
-	, openDatabase
-	, saveDatabase
-	, closeDatabase
 	, createCollection
 	, getCollection
 	, deleteCollection
@@ -502,14 +495,6 @@ custom name fn = Query $ singleton $
 	}
 
 class Database d where
-	createDatabase :: forall e. String  -> Eff (db :: DATABASE | e) Unit
-	deleteDatabase :: forall e. String  -> Eff (db :: DATABASE | e) Unit
-	importDatabase :: forall e. Foreign -> Eff (db :: DATABASE | e) Unit
-	exportDatabase :: forall e. Eff (db :: DATABASE | e) Foreign
-	openDatabase   :: forall e. String  -> Eff (db :: DATABASE | e) Unit
-	saveDatabase   :: forall e. String  -> Eff (db :: DATABASE | e) Unit
-	closeDatabase  :: forall e. String  -> Eff (db :: DATABASE | e) Unit
-
 	createCollection :: forall e. String   -> Eff (db :: DATABASE | e) Unit
 	getCollection    :: forall e t. String ->
 			    Eff (db :: DATABASE | e) (Ref (Collection t))
