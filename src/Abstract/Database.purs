@@ -9,6 +9,7 @@ module Abstract.Database
 	, asc
 	, desc
 	, sortOrder
+	, getClauseType
 	, Clause
 	, clause
 	, LogicConnector
@@ -206,26 +207,37 @@ instance showClause :: Show Clause where
 instance eqClause :: Eq Clause where
 	eq c1 c2 = show c1 == show c2
 
-clause :: { equals              :: Clause             
-	  , notEquals           :: Clause          
-	  , lessThan            :: Clause           
-	  , lessThanOrEquals    :: Clause   
-	  , greaterThan         :: Clause        
-	  , greaterThanOrEquals :: Clause
-	  , sortBy              :: SortOrder -> Clause
-	  , custom              :: String    -> Clause
-	  , negate              :: Clause    -> Clause   
+getClauseType :: Clause -> String
+getClauseType Equals              = "Equals"
+getClauseType NotEquals           = "NotEquals"
+getClauseType LessThan            = "LessThan"
+getClauseType LessThanOrEquals    = "LessThanOrEquals"
+getClauseType GreaterThan         = "GreaterThan"
+getClauseType GreaterThanOrEquals = "GreaterThanOrEquals"
+getClauseType (SortBy _)          = "SortBy"
+getClauseType (Custom _)          = "Custom"
+getClauseType (Negate _)          = "Negate"
+
+clause :: { equals              :: String
+	  , notEquals           :: String
+	  , lessThan            :: String
+	  , lessThanOrEquals    :: String
+	  , greaterThan         :: String
+	  , greaterThanOrEquals :: String
+	  , sortBy              :: String
+	  , custom              :: String
+	  , negate              :: String
 	  }
 clause =
-	{ equals             : Equals
-	, notEquals          : NotEquals
-	, lessThan           : LessThan
-	, lessThanOrEquals   : LessThanOrEquals
-	, greaterThan        : GreaterThan
-	, greaterThanOrEquals: GreaterThanOrEquals
-	, sortBy             : SortBy
-	, custom             : Custom
-	, negate             : Negate
+	{ equals             : getClauseType Equals
+	, notEquals          : getClauseType NotEquals
+	, lessThan           : getClauseType LessThan
+	, lessThanOrEquals   : getClauseType LessThanOrEquals
+	, greaterThan        : getClauseType GreaterThan
+	, greaterThanOrEquals: getClauseType GreaterThanOrEquals
+	, sortBy             : getClauseType $ SortBy desc
+	, custom             : getClauseType $ Custom mempty
+	, negate             : getClauseType $ Negate Equals
 	}
 
 data LogicConnector = And | Or
@@ -457,7 +469,7 @@ greaterThanOrEqualsFlipped :: forall t o. (AsForeign o, Ord o) =>
 greaterThanOrEqualsFlipped = flip greaterThanOrEquals
 infixl 4 greaterThanOrEqualsFlipped as >=.
 
-sortBy' :: forall t. SortOrder -> String -> Query SQL t
+sortBy' :: forall datastore t. SortOrder -> String -> Query datastore t
 sortBy' order fieldName = Query $ singleton $
 	{ clause        : SortBy order
 	, logicConnector: And
@@ -465,7 +477,7 @@ sortBy' order fieldName = Query $ singleton $
 	, predicate     : Left fieldName
 	}
 
-sortBy :: forall t. SortOrder -> (t -> Ordering) -> Query Native t
+sortBy :: forall datastore t. SortOrder -> (t -> Ordering) -> Query datastore t
 sortBy order fn = Query $ singleton $
 	{ clause        : SortBy order
 	, logicConnector: And
@@ -495,7 +507,7 @@ class Database d where
 	importDatabase :: forall e. Foreign -> Eff (db :: DATABASE | e) Unit
 	exportDatabase :: forall e. Eff (db :: DATABASE | e) Foreign
 	openDatabase   :: forall e. String  -> Eff (db :: DATABASE | e) Unit
-	saveDatabase   :: forall e. Eff (db :: DATABASE | e) Unit
+	saveDatabase   :: forall e. String  -> Eff (db :: DATABASE | e) Unit
 	closeDatabase  :: forall e. String  -> Eff (db :: DATABASE | e) Unit
 
 	createCollection :: forall e. String   -> Eff (db :: DATABASE | e) Unit
