@@ -7,22 +7,32 @@ module Abstract.Database
 	, fromDBObject
 	, class IsDBObject
 	, Collection
-	, Pagination
+	, Pagination(Pagination)
 	, limit
 	, skip
-	, SortOrder
+	, SortOrder(Ascending, Descending)
 	, asc
 	, desc
 	, sortOrder
 	, getClauseType
 	, Clause
+		( Equals
+		, NotEquals
+		, LessThan
+		, LessThanOrEquals
+		, GreaterThan
+		, GreaterThanOrEquals
+		, SortBy
+		, Custom
+		, Negate
+		)
 	, clause
-	, LogicConnector
+	, LogicConnector(And, Or)
 	, logicConnector
 	, Predicate
 	, SQL
 	, Native
-	, Query
+	, Query(Query)
 	, ordering
 	, equals'
 	, equals'Flipped
@@ -66,7 +76,7 @@ module Abstract.Database
 	, sortBy
 	, custom'
 	, custom
-	, Entity
+	, Entity(..)
 	, class Database
 	, createCollection
 	, getCollection
