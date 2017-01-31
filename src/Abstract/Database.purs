@@ -303,9 +303,9 @@ data Clause = Equals
 	    | LessThanOrEquals
 	    | GreaterThan
 	    | GreaterThanOrEquals
-	    | SortBy SortOrder
-	    | Custom String -- ^ The name of the custom clause.
-	    | Negate Clause
+	    | SortBy { sortOrder :: SortOrder }
+	    | Custom { name      :: String    }
+	    | Negate { clause    :: Clause    }
 
 instance showClause :: Show Clause where
 	show Equals              = "Equals"
@@ -314,9 +314,11 @@ instance showClause :: Show Clause where
 	show LessThanOrEquals    = "LessThanOrEquals"
 	show GreaterThan         = "GreaterThan"
 	show GreaterThanOrEquals = "GreaterThanOrEquals"
-	show (SortBy s)          = "SortBy (" <> show s <> ")"
-	show (Custom c)          = "Custom (" <> show c <> ")"
-	show (Negate c)          = "Negate (" <> show c <> ")"
+	show (SortBy s)          =
+		"SortBy ({ sortOrder: " <> show s.sortOrder <> " })"
+	show (Custom n)          = "Custom ({ name: " <> show n.name <> " })"
+	show (Negate c)          =
+		"Negate ({ clause: " <> show c.clause <> " })"
 
 instance eqClause :: Eq Clause where
 	eq c1 c2 = show c1 == show c2
@@ -349,9 +351,9 @@ clause =
 	, lessThanOrEquals   : getClauseType LessThanOrEquals
 	, greaterThan        : getClauseType GreaterThan
 	, greaterThanOrEquals: getClauseType GreaterThanOrEquals
-	, sortBy             : getClauseType $ SortBy desc
-	, custom             : getClauseType $ Custom mempty
-	, negate             : getClauseType $ Negate Equals
+	, sortBy             : getClauseType $ SortBy { sortOrder: desc }
+	, custom             : getClauseType $ Custom { name: mempty }
+	, negate             : getClauseType $ Negate { clause: Equals }
 	}
 
 data LogicConnector = And | Or
@@ -600,7 +602,7 @@ infixl 4 greaterThanOrEqualsFlipped as >=.
 
 sortBy' :: forall datastore t. SortOrder -> String -> Query datastore t
 sortBy' order fieldName = Query $ singleton $
-	{ clause        : SortBy order
+	{ clause        : SortBy { sortOrder: order }
 	, logicConnector: And
 	, clauseValue   : writeUndefined
 	, predicate     : Left fieldName
@@ -610,7 +612,7 @@ sortBy :: forall datastore t. SortOrder ->
 	  (t -> Ordering)               ->
 	  Query datastore t
 sortBy order fn = Query $ singleton $
-	{ clause        : SortBy order
+	{ clause        : SortBy { sortOrder: order }
 	, logicConnector: And
 	, clauseValue   : writeUndefined
 	, predicate     : Right (fn >>> orderingToInt >>> toDBObject)
@@ -618,7 +620,7 @@ sortBy order fn = Query $ singleton $
 
 custom' :: forall t. String -> String -> Query SQL t
 custom' name p = Query $ singleton $
-	{ clause        : Custom name
+	{ clause        : Custom { name }
 	, logicConnector: And
 	, clauseValue   : writeUndefined
 	, predicate     : Left p
@@ -626,7 +628,7 @@ custom' name p = Query $ singleton $
 
 custom :: forall t. String -> (t -> Boolean) -> Query Native t
 custom name fn = Query $ singleton $
-	{ clause        : Custom name
+	{ clause        : Custom { name }
 	, logicConnector: And
 	, clauseValue   : writeUndefined
 	, predicate     : Right (fn >>> toDBObject)
