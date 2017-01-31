@@ -30,8 +30,6 @@ module Abstract.Database
 	, LogicConnector(And, Or)
 	, logicConnector
 	, Predicate
-	, SQL
-	, Native
 	, Query(Query)
 	, ordering
 	, equals'
@@ -98,6 +96,7 @@ import Prelude
 	, Ordering(EQ, GT, LT)
 	, Unit
 	, compare
+	, const
 	, flip
 	, map
 	, negate
@@ -110,12 +109,13 @@ import Prelude
 	, (>=>)
 	, (<<<)
 	, (>>>)
+	, (<$>)
 	)
 
 import Control.Alt           (class Alt, (<|>))
 import Control.Monad.Eff     (Eff)
 import Control.Monad.Eff.Ref (REF, Ref)
-import Control.Monad.Except  (mapExcept)
+import Control.Monad.Except  (mapExcept, runExcept)
 import Data.Array            (length, range, zipWith)
 import Data.Foreign
 	( F
@@ -136,7 +136,7 @@ import Data.Foreign.Undefined
 	, readUndefined
 	, writeUndefined
 	)
-import Data.Either           (Either(Left, Right))
+import Data.Either           (Either(Left, Right), either)
 import Data.List             (List, singleton, uncons)
 import Data.Maybe            (Maybe(Just, Nothing), maybe)
 import Data.Monoid           (class Monoid, mempty)
@@ -387,7 +387,7 @@ type Predicate t =
 	{ clause         :: Clause
 	, logicConnector :: LogicConnector
 	, clauseValue    :: Foreign
-	, predicate      :: Either String (t -> Foreign)
+	, predicate      :: Either String (Foreign -> Maybe Foreign)
 	}
 
 showPredicate :: forall t. Predicate t -> String
@@ -395,11 +395,8 @@ showPredicate p = "({"
 	<> " clause: "          <> show p.clause
 	<> ", logicConnector: " <> show p.logicConnector
 	<> ", clauseValue: "    <> "(Foreign)"
-	<> ", predicate: "      <> "(t -> Foreign)"
+	<> ", predicate: "      <> "(Foreign -> Maybe Foreign)"
 	<> " })"
-
-data SQL
-data Native
 
 data Query datastore t = Query (List (Predicate t))
 
@@ -449,164 +446,185 @@ leftPredicate clause_ clauseValue fieldName = Query $ singleton $
 	, predicate     : Left fieldName
 	}
 
-rightPredicate :: forall t a datastore. (ToDBObject a) =>
-		  Clause                               ->
-		  a                                    ->
-		  (t -> a)                             ->
+-- In this contexts this is used, it *should* never fail a conversion (because
+-- this will most likely be used with data gotten back directly from the
+-- datastore.
+fromDBObject' :: forall t. FromDBObject t => Foreign -> Maybe t
+fromDBObject' = fromDBObject >>> runExcept >>> either (const Nothing) Just
+
+predicate' :: forall t a. (FromDBObject t, ToDBObject a) =>
+	      (t -> a)                                   ->
+	      Foreign                                    ->
+	      Maybe Foreign
+predicate' fn t' = (fn >>> toDBObject) <$> fromDBObject' t'
+
+rightPredicate :: forall t a datastore. (FromDBObject t, ToDBObject a) =>
+		  Clause                                               ->
+		  a                                                    ->
+		  (t -> a)                                             ->
 		  Query datastore t
 rightPredicate clause_ clauseValue fn = Query $ singleton $
 	{ clause        : clause_
 	, logicConnector: And
 	, clauseValue   : toDBObject clauseValue
-	, predicate     : Right (fn >>> toDBObject)
+	, predicate     : Right $ predicate' fn
 	}
 
-equals' :: forall t e. (ToDBObject e, Eq e) => e -> String -> Query SQL t
+equals' :: forall datastore t e. (ToDBObject e, Eq e) =>
+	   e                                          ->
+	   String                                     ->
+	   Query datastore t
 equals' = leftPredicate Equals
 
-equals'Flipped :: forall t e. (ToDBObject e, Eq e) =>
-		  String                           ->
-		  e                                ->
-		  Query SQL t
+equals'Flipped :: forall datastore t e. (ToDBObject e, Eq e) =>
+		  String                                     ->
+		  e                                          ->
+		  Query datastore t
 equals'Flipped = flip equals'
 infix 4 equals'Flipped as ==..
 
-equals :: forall t e. (ToDBObject e, Eq e) =>
-	  e                                ->
-	  (t -> e)                         ->
-	  Query Native t
+equals :: forall datastore t e. (FromDBObject t, ToDBObject e, Eq e) =>
+	  e                                                          ->
+	  (t -> e)                                                   ->
+	  Query datastore t
 equals = rightPredicate Equals
 
-equalsFlipped :: forall t e. (ToDBObject e, Eq e) =>
-		 (t -> e)                         ->
-		 e                                ->
-		 Query Native t
+equalsFlipped :: forall datastore t e. (FromDBObject t, ToDBObject e, Eq e) =>
+		 (t -> e)                                                   ->
+		 e                                                          ->
+		 Query datastore t
 equalsFlipped = flip equals
 infix 4 equalsFlipped as ==.
 
-notEquals' :: forall t e. (ToDBObject e, Eq e) => e -> String -> Query SQL t
+notEquals' :: forall datastore t e. (ToDBObject e, Eq e) =>
+	      e                                          ->
+	      String                                     ->
+	      Query datastore t
 notEquals' = leftPredicate NotEquals
 
-notEquals'Flipped :: forall t e. (ToDBObject e, Eq e) =>
-		     String                           ->
-		     e                                ->
-		     Query SQL t
+notEquals'Flipped :: forall datastore t e. (ToDBObject e, Eq e) =>
+		     String                                     ->
+		     e                                          ->
+		     Query datastore t
 notEquals'Flipped = flip notEquals'
 infix 4 notEquals'Flipped as /=..
 infix 4 notEquals'Flipped as !=..
 
-notEquals :: forall t e. (ToDBObject e, Eq e) =>
-	     e                                ->
-	     (t -> e)                         ->
-	     Query Native t
+notEquals :: forall datastore t e. (FromDBObject t, ToDBObject e, Eq e) =>
+	     e                                                          ->
+	     (t -> e)                                                   ->
+	     Query datastore t
 notEquals = rightPredicate NotEquals
 
-notEqualsFlipped :: forall t e. (ToDBObject e, Eq e) =>
-		    (t -> e)                         ->
-		    e                                ->
-		    Query Native t
+notEqualsFlipped :: forall datastore t e. (FromDBObject t, ToDBObject e, Eq e) =>
+		    (t -> e)                                                   ->
+		    e                                                          ->
+		    Query datastore t
 notEqualsFlipped = flip notEquals
 infix 4 notEquals' as /=.
 infix 4 notEquals' as !=.
 
-lessThan' :: forall t o. (ToDBObject o, Ord o) => o -> String -> Query SQL t
+lessThan' :: forall datastore t o. (ToDBObject o, Ord o) =>
+	     o                                           ->
+	     String                                      ->
+	     Query datastore t
 lessThan' = leftPredicate LessThan
 
-lessThan'Flipped :: forall t o. (ToDBObject o, Ord o) =>
-		    String                            ->
-		    o                                 ->
-		    Query SQL t
+lessThan'Flipped :: forall datastore t o. (ToDBObject o, Ord o) =>
+	     String                                             ->
+	     o                                                  ->
+	     Query datastore t
 lessThan'Flipped = flip lessThan'
 infixl 4 lessThan'Flipped as <..
 
-lessThan :: forall t o. (ToDBObject o, Ord o) =>
-	    o                                 ->
-	    (t -> o)                          ->
-	    Query Native t
+lessThan :: forall datastore t o. (FromDBObject t, ToDBObject o, Ord o) =>
+	    o                                                           ->
+	    (t -> o)                                                    ->
+	    Query datastore t
 lessThan = rightPredicate LessThan
 
-lessThanFlipped :: forall t o. (ToDBObject o, Ord o) =>
-		   (t -> o)                          ->
-		   o                                 ->
-		   Query Native t
+lessThanFlipped :: forall datastore t o. (FromDBObject t, ToDBObject o, Ord o) =>
+		   (t -> o)                                                    ->
+		   o                                                           ->
+		   Query datastore t
 lessThanFlipped = flip lessThan
 infixl 4 lessThanFlipped as <.
 
-lessThanOrEquals' :: forall t o. (ToDBObject o, Ord o) =>
-		     o                                 ->
-		     String                            ->
-		     Query SQL t
+lessThanOrEquals' :: forall datastore t o. (ToDBObject o, Ord o) =>
+		     o                                           ->
+		     String                                      ->
+		     Query datastore t
 lessThanOrEquals' = leftPredicate LessThanOrEquals
 
-lessThanOrEquals'Flipped :: forall t o. (ToDBObject o, Ord o) =>
-			    String                            ->
-			    o                                 ->
-			    Query SQL t
+lessThanOrEquals'Flipped :: forall datastore t o. (ToDBObject o, Ord o) =>
+			    String                                      ->
+			    o                                           ->
+			    Query datastore t
 lessThanOrEquals'Flipped = flip lessThanOrEquals'
 infixl 4 lessThanOrEquals'Flipped as <=..
 
-lessThanOrEquals :: forall t o. (ToDBObject o, Ord o) =>
-		    o                                 ->
-		    (t -> o)                          ->
-		    Query Native t
+lessThanOrEquals :: forall datastore t o. (FromDBObject t, ToDBObject o, Ord o) =>
+		    o                                                           ->
+		    (t -> o)                                                    ->
+		    Query datastore t
 lessThanOrEquals = rightPredicate LessThanOrEquals
 
-lessThanOrEqualsFlipped :: forall t o. (ToDBObject o, Ord o) =>
-			   (t -> o)                          ->
-			   o                                 ->
-			   Query Native t
+lessThanOrEqualsFlipped :: forall datastore t o. (FromDBObject t, ToDBObject o, Ord o) =>
+			   (t -> o)                                                    ->
+			   o                                                           ->
+			   Query datastore t
 lessThanOrEqualsFlipped = flip lessThanOrEquals
 infixl 4 lessThanOrEqualsFlipped as <=.
 
-greaterThan' :: forall t o. (ToDBObject o, Ord o) =>
-		o                                 ->
-		String                            ->
-		Query SQL t
+greaterThan' :: forall datastore t o. (ToDBObject o, Ord o) =>
+		o                                           ->
+		String                                      ->
+		Query datastore t
 greaterThan' = leftPredicate GreaterThan
 
-greaterThan'Flipped :: forall t o. (ToDBObject o, Ord o) =>
-		       String                            ->
-		       o                                 ->
-		       Query SQL t
+greaterThan'Flipped :: forall datastore t o. (ToDBObject o, Ord o) =>
+		       String                                      ->
+		       o                                           ->
+		       Query datastore t
 greaterThan'Flipped = flip greaterThan'
 infixl 4 greaterThan'Flipped as >..
 
-greaterThan :: forall t o. (ToDBObject o, Ord o) =>
-	       o                                 ->
-	       (t -> o)                          ->
-	       Query Native t
+greaterThan :: forall datastore t o. (FromDBObject t, ToDBObject o, Ord o) =>
+	       o                                                           ->
+	       (t -> o)                                                    ->
+	       Query datastore t
 greaterThan = rightPredicate GreaterThan
 
-greaterThanFlipped :: forall t o. (ToDBObject o, Ord o) =>
-		     (t -> o)                           ->
-		     o                                  ->
-		     Query Native t
+greaterThanFlipped :: forall datastore t o. (FromDBObject t, ToDBObject o, Ord o) =>
+	       (t -> o)                                                           ->
+	       o                                                                  ->
+	       Query datastore t
 greaterThanFlipped = flip greaterThan
 infixl 4 greaterThanFlipped as >.
 
-greaterThanOrEquals' :: forall t o. (ToDBObject o, Ord o) =>
-			o                                 ->
-			String                            ->
-			Query SQL t
+greaterThanOrEquals' :: forall datastore t o. (ToDBObject o, Ord o) =>
+			o                                           ->
+			String                                      ->
+			Query datastore t
 greaterThanOrEquals' = leftPredicate GreaterThanOrEquals
 
-greaterThanOrEquals'Flipped :: forall t o. (ToDBObject o, Ord o) =>
-			       String                            ->
-			       o                                 ->
-			       Query SQL t
+greaterThanOrEquals'Flipped :: forall datastore t o. (ToDBObject o, Ord o) =>
+			       String                                      ->
+			       o                                           ->
+			       Query datastore t
 greaterThanOrEquals'Flipped = flip greaterThanOrEquals'
 infixl 4 greaterThanOrEquals'Flipped as >=..
 
-greaterThanOrEquals :: forall t o. (ToDBObject o, Ord o) =>
-		       o                                 ->
-		       (t -> o)                          ->
-		       Query Native t
+greaterThanOrEquals :: forall datastore t o. (FromDBObject t, ToDBObject o, Ord o) =>
+		       o                                                           ->
+		       (t -> o)                                                    ->
+		       Query datastore t
 greaterThanOrEquals = rightPredicate GreaterThanOrEquals
 
-greaterThanOrEqualsFlipped :: forall t o. (ToDBObject o, Ord o) =>
-			      (t -> o)                          ->
-			      o                                 ->
-			      Query Native t
+greaterThanOrEqualsFlipped :: forall datastore t o. (FromDBObject t, ToDBObject o, Ord o) =>
+		       (t -> o)                                                    ->
+		       o                                                           ->
+		       Query datastore t
 greaterThanOrEqualsFlipped = flip greaterThanOrEquals
 infixl 4 greaterThanOrEqualsFlipped as >=.
 
@@ -618,17 +636,18 @@ sortBy' order fieldName = Query $ singleton $
 	, predicate     : Left fieldName
 	}
 
-sortBy :: forall datastore t. SortOrder ->
-	  (t -> Ordering)               ->
+sortBy :: forall datastore t. FromDBObject t =>
+	  SortOrder                          ->
+	  (t -> Ordering)                    ->
 	  Query datastore t
 sortBy order fn = Query $ singleton $
 	{ clause        : SortBy { sortOrder: order }
 	, logicConnector: And
 	, clauseValue   : writeUndefined
-	, predicate     : Right (fn >>> orderingToInt >>> toDBObject)
+	, predicate     : Right $ predicate' (fn >>> orderingToInt)
 	}
 
-custom' :: forall t. String -> String -> Query SQL t
+custom' :: forall datastore t. String -> String -> Query datastore t
 custom' name p = Query $ singleton $
 	{ clause        : Custom { name }
 	, logicConnector: And
@@ -636,12 +655,15 @@ custom' name p = Query $ singleton $
 	, predicate     : Left p
 	}
 
-custom :: forall t. String -> (t -> Boolean) -> Query Native t
+custom :: forall datastore t. FromDBObject t =>
+	  String                             ->
+	  (t -> Boolean)                     ->
+	  Query datastore t
 custom name fn = Query $ singleton $
 	{ clause        : Custom { name }
 	, logicConnector: And
 	, clauseValue   : writeUndefined
-	, predicate     : Right (fn >>> toDBObject)
+	, predicate     : Right $ predicate' fn
 	}
 
 data Entity key a = Entity key a | Entity' a
@@ -667,11 +689,11 @@ instance ordEntity :: (Ord key, Ord a) => Ord (Entity key a) where
 	compare (Entity'    _) (Entity _   _) = LT
 	compare (Entity _   _) (Entity'    _) = GT
 
-class Database d datastore where
-	createCollection :: forall e. String   -> Eff (db :: DATABASE | e) Unit
+class Database datastore where
+	createCollection :: forall e. String -> Eff (db :: DATABASE | e) Unit
 	getCollection    :: forall e t. String ->
 			    Eff (db :: DATABASE, ref :: REF | e) (Ref (Collection t))
-	deleteCollection :: forall e. String   -> Eff (db :: DATABASE | e) Unit
+	deleteCollection :: forall e. String -> Eff (db :: DATABASE | e) Unit
 
 	getWhere :: forall e t. FromDBObject t =>
 		    Maybe Pagination           ->
