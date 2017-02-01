@@ -76,6 +76,8 @@ module Abstract.Database
 	, custom
 	, Entity(..)
 	, class Database
+	, openConnection
+	, closeConnection
 	, createCollection
 	, getCollection
 	, deleteCollection
@@ -690,10 +692,18 @@ instance ordEntity :: (Ord key, Ord a) => Ord (Entity key a) where
 	compare (Entity _   _) (Entity'    _) = GT
 
 class Database datastore where
-	createCollection :: forall e. String -> Eff (db :: DATABASE | e) Unit
+	openConnection :: forall e. String -> Eff (db :: DATABASE | e) datastore
+	closeConnection :: forall e. datastore -> Eff (db :: DATABASE | e) Unit
+
+	createCollection :: forall e. String ->
+			    datastore        ->
+			    Eff (db :: DATABASE | e) Unit
 	getCollection    :: forall e t. String ->
+			    datastore          ->
 			    Eff (db :: DATABASE, ref :: REF | e) (Ref (Collection t))
-	deleteCollection :: forall e. String -> Eff (db :: DATABASE | e) Unit
+	deleteCollection :: forall e. String ->
+			    datastore        ->
+			    Eff (db :: DATABASE | e) Unit
 
 	getWhere :: forall e t. FromDBObject t =>
 		    Maybe Pagination           ->
