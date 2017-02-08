@@ -130,7 +130,7 @@ isDBObject :: DBObject -> Boolean
 isDBObject (DBObject _) = true
 isDBObject           _  = false
 
-type Collection datastore t = { collectionImpl :: CollectionImpl }
+type Collection t = { collectionImpl :: CollectionImpl }
 
 newtype Pagination = Pagination
 	{ skip   :: Maybe Int
