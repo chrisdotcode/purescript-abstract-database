@@ -61,7 +61,7 @@ import Prelude
 	)
 
 import Control.Alt             ((<|>))
-import Control.Monad.Eff       (Eff)
+import Control.Monad.Aff       (Aff)
 import Control.Monad.Eff.Ref   (REF, Ref)
 import Data.Array              (index, mapWithIndex)
 import Data.Foreign
@@ -557,50 +557,50 @@ instance setIsDBObject             :: (IsDBObject a, Ord a) => IsDBObject (S.Set
 instance strMapIsDBObject          :: IsDBObject a => IsDBObject (M.StrMap a)
 
 class Database datastore where
-	openConnection :: forall e. String -> Eff (db :: DATABASE | e) datastore
+	openConnection :: forall e. String -> Aff (db :: DATABASE | e) datastore
 
-	closeConnection :: forall e. datastore -> Eff (db :: DATABASE | e) Unit
+	closeConnection :: forall e. datastore -> Aff (db :: DATABASE | e) Unit
 
 	createCollection :: forall e. String ->
 			    datastore        ->
-			    Eff (db :: DATABASE | e) Unit
+			    Aff (db :: DATABASE | e) Unit
 
 	getCollection    :: forall e t. String ->
 			    datastore          ->
-			    Eff (db :: DATABASE, ref :: REF | e) (Ref (Collection t))
+			    Aff (db :: DATABASE, ref :: REF | e) (Ref (Collection t))
 
 	deleteCollection :: forall e. String ->
 			    datastore        ->
-			    Eff (db :: DATABASE | e) Unit
+			    Aff (db :: DATABASE | e) Unit
 
 	getWhere :: forall e t. FromDBObject t =>
 		    Maybe Pagination           ->
 		    Query datastore t          ->
 		    Ref (Collection t)         ->
-		    Eff (db :: DATABASE, ref :: REF | e) (Maybe t)
+		    Aff (db :: DATABASE, ref :: REF | e) (Maybe t)
 
 	getWhere' :: forall e t. FromDBObject t =>
 		    Maybe Pagination            ->
 		    Query datastore t           ->
 		    Ref (Collection t)          ->
-		    Eff (db :: DATABASE, ref :: REF | e) (List t)
+		    Aff (db :: DATABASE, ref :: REF | e) (List t)
 
 	countWhere :: forall e t. FromDBObject t =>
 		      Query datastore t          ->
 		      Ref (Collection t)         ->
-		      Eff (db :: DATABASE, ref :: REF | e) Int
+		      Aff (db :: DATABASE, ref :: REF | e) Int
 
 	insert :: forall e t b. ToDBObject t =>
 		  t                          ->
 		  Ref (Collection t)         ->
-		  Eff (db :: DATABASE, ref :: REF | e) b
+		  Aff (db :: DATABASE, ref :: REF | e) b
 
 	insert' :: forall e t b. ToDBObject t =>
 		   List t                     ->
 		   Ref (Collection t)         ->
-		   Eff (db :: DATABASE, ref :: REF | e) b
+		   Aff (db :: DATABASE, ref :: REF | e) b
 
 	deleteWhere :: forall e t b. ToDBObject t =>
 		       Query datastore t          ->
 		       Ref (Collection t)         ->
-		       Eff (db :: DATABASE, ref :: REF | e) b
+		       Aff (db :: DATABASE, ref :: REF | e) b
