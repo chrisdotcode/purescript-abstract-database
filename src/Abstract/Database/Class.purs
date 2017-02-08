@@ -32,6 +32,7 @@ module Abstract.Database.Class
 	, createCollection
 	, getCollection
 	, deleteCollection
+	, class Collection
 	, getWhere
 	, getWhere'
 	, countWhere
@@ -573,34 +574,35 @@ class Database datastore where
 			    datastore        ->
 			    Aff (db :: DATABASE | e) Unit
 
-	getWhere :: forall e t. FromDBObject t   =>
-		    Maybe Pagination             ->
-		    Query t                      ->
-		    Ref (Collection t)           ->
+class Collection c where
+	getWhere :: forall e t. FromDBObject t =>
+		    Maybe Pagination           ->
+		    Query t                    ->
+		    Ref (Collection t)         ->
 		    Aff (db :: DATABASE, ref :: REF | e) (Maybe t)
 
-	getWhere' :: forall e t. FromDBObject t  =>
-		    Maybe Pagination             ->
-		    Query t                      ->
-		    Ref (Collection t)           ->
+	getWhere' :: forall e t. FromDBObject t =>
+		    Maybe Pagination            ->
+		    Query t                     ->
+		    Ref (Collection t)          ->
 		    Aff (db :: DATABASE, ref :: REF | e) (List t)
 
-	countWhere :: forall e t. FromDBObject t   =>
-		      Query t                      ->
-		      Ref (Collection t)           ->
+	countWhere :: forall e t. FromDBObject t =>
+		      Query t                    ->
+		      Ref (Collection t)         ->
 		      Aff (db :: DATABASE, ref :: REF | e) Int
 
-	insert :: forall e t b. ToDBObject t   =>
-		  t                            ->
-		  Ref (Collection t)           ->
+	insert :: forall e t b. ToDBObject t =>
+		  t                          ->
+		  Ref (Collection t)         ->
 		  Aff (db :: DATABASE, ref :: REF | e) b
 
-	insert' :: forall e t b. ToDBObject t   =>
-		   List t                       ->
-		   Ref (Collection t)           ->
+	insert' :: forall e t b. ToDBObject t =>
+		   List t                     ->
+		   Ref (Collection t)         ->
 		   Aff (db :: DATABASE, ref :: REF | e) b
 
-	deleteWhere :: forall e t b. ToDBObject t   =>
-		       Query t                      ->
-		       Ref (Collection t)           ->
+	deleteWhere :: forall e t b. ToDBObject t =>
+		       Query t                    ->
+		       Ref (Collection t)         ->
 		       Aff (db :: DATABASE, ref :: REF | e) b
