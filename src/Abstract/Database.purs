@@ -79,6 +79,7 @@ import Abstract.Database.Class
 	, createCollection
 	, getCollection
 	, deleteCollection
+	, class Collection
 	, getWhere
 	, getWhere'
 	, countWhere
