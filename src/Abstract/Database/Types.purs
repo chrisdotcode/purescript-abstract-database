@@ -130,7 +130,7 @@ isDBObject :: DBObject -> Boolean
 isDBObject (DBObject _) = true
 isDBObject           _  = false
 
-type Collection datastore t = { collectionImpl :: CollectionImpl }
+type Collection t = { collectionImpl :: CollectionImpl }
 
 newtype Pagination = Pagination
 	{ skip   :: Maybe Int
@@ -301,22 +301,22 @@ showPredicate p = "({"
 	<> ", predicate: "      <> "(Either String (FromDBObject t => t -> DBObject)"
 	<> " })"
 
-data Query datastore t = Query (List (Predicate t))
+data Query t = Query (List (Predicate t))
 
-instance showQuery :: Show (Query datastore t) where
+instance showQuery :: Show (Query t) where
 	show (Query l) =
-		"(Query (datastore) " <> show (map showPredicate l) <> ")"
+		"(Query " <> show (map showPredicate l) <> ")"
 
-instance semigroupQuery :: Semigroup (Query datastore t) where
+instance semigroupQuery :: Semigroup (Query t) where
 	append (Query l1) (Query l2) = Query (l1 <> l2)
 
-instance monoidQuery :: Monoid (Query datastore t) where
+instance monoidQuery :: Monoid (Query t) where
 	mempty = Query mempty
 
-instance functorQuery :: Functor (Query datastore) where
+instance functorQuery :: Functor Query where
 	map _ q = unsafeCoerce q -- Father, forgive me.
 
-instance altQuery :: Alt (Query datastore) where
+instance altQuery :: Alt Query where
 	alt (Query l1) (Query l2) =
 		case uncons l2 of
 			Just { head, tail } ->

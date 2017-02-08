@@ -73,13 +73,13 @@ import Abstract.Database.Class
 	, toDBObject
 	)
 
-type LeftPredicate datastore t a = a -> String -> Query datastore t 
+type LeftPredicate datastore t a = a -> String -> Query t
 
-type LeftPredicateFlipped datastore t a = String -> a -> Query datastore t
+type LeftPredicateFlipped datastore t a = String -> a -> Query t
 
-type RightPredicate datastore t a = a -> (t -> a) -> Query datastore t
+type RightPredicate datastore t a = a -> (t -> a) -> Query t
 
-type RightPredicateFlipped datastore t a = (t -> a) -> a -> Query datastore t
+type RightPredicateFlipped datastore t a = (t -> a) -> a -> Query t
 
 leftPredicate :: forall datastore t a. (FromDBObject t, ToDBObject a) =>
 		 Clause                                               ->
@@ -227,10 +227,10 @@ sortBy' order fieldName = Query $ singleton $
 	, predicate     : Left fieldName
 	}
 
-sortBy :: forall datastore t. FromDBObject t =>
-	  SortOrder                          ->
-	  (t -> Ordering)                    ->
-	  Query datastore t
+sortBy :: forall t. FromDBObject t =>
+	  SortOrder                ->
+	  (t -> Ordering)          ->
+	  Query t
 sortBy order fn = Query $ singleton $
 	{ clause        : SortBy { sortOrder: order }
 	, logicConnector: And
@@ -252,10 +252,10 @@ custom' name p = Query $ singleton $
 	, predicate     : Left p
 	}
 
-custom :: forall datastore t. FromDBObject t =>
-	  String                             ->
-	  (t -> Boolean)                     ->
-	  Query datastore t
+custom :: forall t. FromDBObject t =>
+	  String                   ->
+	  (t -> Boolean)           ->
+	  Query t
 custom name fn = Query $ singleton $
 	{ clause        : Custom { name }
 	, logicConnector: And
@@ -263,9 +263,9 @@ custom name fn = Query $ singleton $
 	, predicate     : Right (fn >>> toDBObject)
 	}
 
-negate :: forall datastore t. FromDBObject t =>
-	  Query datastore t                  ->
-	  Query datastore t
+negate :: forall t. FromDBObject t =>
+	  Query t                  ->
+	  Query t
 negate (Query ps) = Query $ map negator ps
 	where
 		negator p = p { clause = Negate { clause: p.clause } }
